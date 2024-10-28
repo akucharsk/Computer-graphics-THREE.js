@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+ <!-- It's the HTML5 standard. -->
+ 
+ <html>
+     <head>
+         <title>Example 01 - triangle and square</title>
+         <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+ 
+         <!-- The following meta line optimizes the site for mobile devices. 
+		 It sets the viewport size to the screen size, so it will be displayed maximized, but unscaled. -->
+         <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
+         <style type="text/css">
+             body {
+                 /* Set the background color of the HTML page to black */
+                 background-color: #000000;
+ 
+                 /* Hide oversized content. This prevents the scroll bars. */
+                 overflow: hidden;
+             }
+         </style>
+         <!-- Include Three.js library -->
+         <script src="three.js"></script>
+         <script src="Detector.js"></script>
+     </head>
+     <body>
+         <!-- This is the DIV element which will contain the WebGL canvas. To be identifiable later on, the id 'WebGLCanvas' is applied to it. -->
+         <div id="WebGLCanvas"> </div>
+ 
+         <!-- This JavaScript block encloses the Three.js commands -->
+        <script>
+             // Global scene object
+             var scene;
+ 
+             // Global camera object
+             var camera;
+
+             var christmasTree;
+             var house = new THREE.Group();
+             var car = new THREE.Group();
+             var coneTree;
+
+             function createMergedGeometry(geometries) {
+                 const geometry = new THREE.Geometry();
+                 geometries.forEach(geom => geometry.merge(geom));
+                 return geometry;
+             }
+
+             function createTriangleGeometry(pointA, pointB, pointC) {
+                 const [xA, yA, zA] = pointA;
+                 const [xB, yB, zB] = pointB;
+                 const [xC, yC, zC] = pointC;
+
+                 const geometry = new THREE.Geometry();
+
+                 geometry.vertices.push(
+                     new THREE.Vector3(xA, yA, zA),
+                     new THREE.Vector3(xB, yB, zB),
+                     new THREE.Vector3(xC, yC, zC),
+                 );
+
+                 return geometry;
+             }
+             
+             function createRectangleGeometry(width, height, origin = [0, 0, 0], zOffset = [0, 0, 0, 0]) {
+                 const geometry = new THREE.Geometry();
+                 const halfWidth = width / 2;
+                 const halfHeight = height / 2;
+
+                 const [x, y, z] = origin;
+
+                 geometry.vertices.push(
+                     new THREE.Vector3(-halfWidth + x, -halfHeight + y, zOffset[0] + z),
+                     new THREE.Vector3(-halfWidth + x, halfHeight + y, zOffset[1] + z),
+                     new THREE.Vector3(halfWidth + x, halfHeight + y, zOffset[2] + z),
+                     new THREE.Vector3(halfWidth + x, -halfHeight + y, zOffset[3] + z),
+                 )
+
+                 geometry.faces.push(
+                     new THREE.Face3(0, 1, 2),
+                     new THREE.Face3(0, 2, 3),
+                 )
+                 
+                 return geometry;
+             }
+
+             function createCircle(radius, color, x, y, z) {
+                 const circleGeometry = new THREE.CircleGeometry(radius, 32);
+                 const material = new THREE.MeshBasicMaterial({
+                     color: color,
+                     side: THREE.DoubleSide,
+                 })
+
+                 const mesh = new THREE.Mesh(circleGeometry, material);
+                 mesh.position.set(x, y, z);
+
+                 return mesh;
+             }
+
+             function createTriangle(pointA, pointB, pointC, color, x, y, z) {
+
+                 const geometry = createTriangleGeometry(pointA, pointB, pointC);
+
+                 const material = new THREE.MeshBasicMaterial({
+                     color: color,
+                     side: THREE.DoubleSide,
+                 })
+
+                 geometry.faces.push(new THREE.Face3(0, 1, 2));
+
+                 const mesh = new THREE.Mesh(geometry, material);
+                 mesh.position.set(x, y, z)
+
+                 return mesh;
+             }
+
+             function createRectangle(width, height, color, x = 0, y = 0, z = 0, zOffset = [0, 0, 0, 0]) {
+
+                 const geometry = createRectangleGeometry(width, height, zOffset)
+                 const material = new THREE.MeshBasicMaterial({
+                     color: color,
+                     side: THREE.DoubleSide,
+                 })
+
+                 const mesh = new THREE.Mesh(geometry, material);
+                 mesh.position.set(x, y, z)
+                 return mesh;
+             }
+
+             function createChristmasTree({
+                     branchCount: branchCount = 3,
+                     topY: topY = 2,
+                     bottomY: bottomY = -2,
+                     minWidth: minWidth = 1,
+                     maxWidth: maxWidth = 2,
+                     trunkPart: trunkPart = 0.2,
+                     color: color = 0x00ff00
+             }) {
+                 maxWidth = minWidth > maxWidth - 1 ? minWidth + 1 : maxWidth;
+                 topY = bottomY > topY - 1 ? bottomY + 1 : topY;
+
+                 const treeHeight = topY - bottomY;
+                 const trunkHeight = treeHeight * trunkPart;
+
+                 const dy = (treeHeight - trunkHeight) / (branchCount + 1);
+                 const dx = (maxWidth - minWidth) / branchCount;
+                 const triangles = Array.from({length: branchCount}, function (_, index) {
+                     const branchTop = topY - (index + 1) * dy;
+
+                     const geometry = createTriangleGeometry(
+                         [-minWidth - index * dx / 2, branchTop - dy, 0],
+                         [minWidth + index * dx / 2, branchTop - dy, 0],
+                         [0, branchTop + dy]
+                     );
+                     geometry.faces.push(new THREE.Face3(0, 1, 2));
+                     return geometry;
+                 })
+
+                 const geometry = createMergedGeometry(triangles)
+
+                 const material = new THREE.MeshBasicMaterial({
+                     color: color,
+                     side: THREE.DoubleSide,
+                 })
+
+                 const mesh = new THREE.Mesh(geometry, material);
+
+                 const trunk = createRectangle(minWidth / 3, trunkHeight, 0x915b1d, 0, bottomY + trunkHeight / 2, 0)
+                 const group = new THREE.Group();
+
+                 group.add(trunk);
+                 group.add(mesh);
+                 return group;
+             }
+
+             function createConeChristmasTree({
+                                                  branchCount: branchCount = 5,
+                                                  topY: topY = 2,
+                                                  bottomY: bottomY = -2,
+                                                  minWidth: minWidth = 1,
+                                                  maxWidth: maxWidth = 2,
+                                                  trunkPart: trunkPart = 0.2,
+                                                  color: color = 0x00ff00,
+                                                  trunkColor: trunkColor = 0xaca055
+                                              }) {
+                 maxWidth = minWidth > maxWidth - 1 ? minWidth + 1 : maxWidth;
+                 topY = bottomY > topY - 1 ? bottomY + 1 : topY;
+
+                 const treeHeight = topY - bottomY;
+                 const trunkHeight = treeHeight * trunkPart;
+
+                 const dy = (treeHeight - trunkHeight) / (branchCount + 1);
+                 const dx = (maxWidth - minWidth) / branchCount;
+                 const group = new THREE.Group();
+
+                 for (var index = 0; index < branchCount; index++) {
+                     const branchTop = topY - (index + 1) * dy;
+
+                     const geometry = new THREE.CylinderGeometry(0, minWidth / 2 + index * dx / 2, 2 * dy, 32, false);
+                     const material = new THREE.MeshBasicMaterial({
+                         color: 0x00ff44,
+                         side: THREE.DoubleSide,
+                     })
+
+                     const mesh = new THREE.Mesh(geometry, material);
+
+                     mesh.position.set(-2, branchTop - index * dy / 2, 4);
+                     group.add(mesh);
+                 }
+
+                 const cubeGeometry = new THREE.CubeGeometry(minWidth / 2, trunkHeight, minWidth / 2);
+                 const cubeMaterial = new THREE.MeshBasicMaterial({
+                     color: trunkColor,
+                     side: THREE.DoubleSide,
+                 })
+                 const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+                 cube.position.set(-2, bottomY - trunkHeight / 2, 4)
+                 group.add(cube);
+
+                 return group;
+             }
+
+             function createHouse({
+                                      width: width,
+                                      height: height,
+                                      floors: floors = 2,
+                                      roofPart: roofPart = 0.2,
+                                      floorColor: floorColor = 0x00ffff,
+                                      roofColor: roofColor = 0xff0000
+             }) {
+                 const roofHeight = height * roofPart;
+                 const floorHeight = (height - roofHeight) / (floors + 1);
+                 
+                 const floorGeometries = Array.from({length: floors + 1}, function (_, index) {
+                     const originY = index * floorHeight + floorHeight / 2;
+                     const geometry = createRectangleGeometry(width, floorHeight, [0, originY, 0]);
+                     geometry.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(0, 2, 3));
+                     return geometry;
+                 })
+
+                 const roof = createTriangle(
+                     [0, roofHeight, 0],
+                     [-width / 2, 0, 0],
+                     [width / 2, 0, 0],
+                     roofColor,
+                     0, height - roofHeight, 0
+                 )
+
+                 const geometry = createMergedGeometry(floorGeometries);
+                 const material = new THREE.MeshBasicMaterial({
+                     color: floorColor,
+                     side: THREE.DoubleSide,
+                 })
+
+                 const mesh = new THREE.Mesh(geometry, material);
+
+                 const group = new THREE.Group();
+                 group.add(roof);
+                 group.add(mesh);
+                 return group;
+             }
+
+             function createCar({
+                                    width: width = 2,
+                                    height: height = 1,
+                                    tyreRatio: tyreRatio = 0.1,
+                 tyreColor: tyreColor = 0x0000ff,
+                 bodyColor: bodyColor = 0x00ff00,
+             }) {
+                 const body = createRectangle(width, height, bodyColor);
+                 const tyreRadius = width * tyreRatio;
+
+                 const leftTyre = createCircle(tyreRadius, tyreColor, -width / 2 + tyreRadius, -height / 2, 0)
+                 const rightTyre = createCircle(tyreRadius, tyreColor, width / 2 - tyreRadius, -height / 2, 0)
+
+                 const group = new THREE.Group();
+                 group.add(body);
+                 group.add(leftTyre);
+                 group.add(rightTyre);
+
+                 return group;
+             }
+
+             var canvasWidth, canvasHeight;
+             var direction = 1;
+ 
+             // Initialize the scene
+             initializeScene();
+ 
+             // Render the scene (map the 3D world to the 2D scene)
+             animateScene();
+ 
+             /**
+              * Initialize the scene.
+              */
+             function initializeScene(){
+                 
+                 renderer = new THREE.WebGLRenderer({antialias:true});
+                  
+                 // Set the background color of the renderer to black, with full opacity
+                 renderer.setClearColor(0x000000, 1);
+ 
+                 // Get the size of the inner window (content area) to create a full size renderer
+                 canvasWidth = window.innerWidth;
+                 canvasHeight = window.innerHeight;
+ 
+                 // Set the renderers size to the content areas size
+                 renderer.setSize(canvasWidth, canvasHeight);
+ 
+                 // Get the DIV element from the HTML document by its ID and append the renderers DOM
+                 // object to it
+                 document.getElementById("WebGLCanvas").appendChild(renderer.domElement);
+ 
+                 // Create the scene, in which all objects are stored (e. g. camera, lights,
+                 // geometries, ...)
+                 scene = new THREE.Scene();
+ 
+                 // Define camera and add it to the scene.
+                 camera = new THREE.PerspectiveCamera(60, canvasWidth / canvasHeight, 1, 100);
+                 camera.position.set(0, 0, -10);
+                 camera.lookAt(scene.position);
+                 scene.add(camera);
+ 
+                 // Create the triangle (or any arbitrary geometry).
+                 var triangleGeometry = new THREE.Geometry();
+                 triangleGeometry.vertices.push(new THREE.Vector3( 0.0,  1.0, 0.0));
+                 triangleGeometry.vertices.push(new THREE.Vector3(-1.0, -1.0, 0.0));
+                 triangleGeometry.vertices.push(new THREE.Vector3( 1.0, -1.0, 0.0));
+                 triangleGeometry.faces.push(new THREE.Face3(0, 1, 2));
+ 
+                 // To color the surface, a material has to be created.
+                 // We use MeshBasicMaterial				 
+                 // from which we need in this example only 'color'.
+ 
+                 // Create a white basic material and activate the 'doubleSided' attribute to force the
+                 // rendering of both sides of each face (front and back). This prevents the so called
+                 // 'backface culling'. Usually, only the side is rendered, whose normal vector points
+                 // towards the camera. The other side is not rendered (backface culling). But this
+                 // performance optimization sometimes leads to wholes in the surface. When this happens
+                 // in your surface, simply set 'doubleSided' to 'true'.
+                 var triangleMaterial = new THREE.MeshBasicMaterial({
+                     color:0xFF0000,
+                     side:THREE.DoubleSide
+                 });
+ 
+                 // Create a mesh and insert the geometry and the material. Translate the whole mesh
+                 // by -1.5 on the x axis and by 4 on the z axis. Finally add the mesh to the scene.
+                 var triangleMesh = new THREE.Mesh(triangleGeometry, triangleMaterial);
+                 triangleMesh.position.set(-4, 0.0, 4.0);
+                 scene.add(triangleMesh);
+                 
+ 
+                 // The creation of the square is done in the same way as the triangle.
+                 // 1. Instantiate the geometry object
+                 // 2. Add the vertices
+                 // 3. Define the faces by setting the vertices indices
+                 var squareGeometry = new THREE.Geometry();
+                 squareGeometry.vertices.push(new THREE.Vector3(-1.0,  1.0, 0.0));
+                 squareGeometry.vertices.push(new THREE.Vector3( 1.0,  1.0, 0.0));
+                 squareGeometry.vertices.push(new THREE.Vector3( 1.0, -1.0, 0.0));
+                 squareGeometry.vertices.push(new THREE.Vector3(-1.0, -1.0, 0.0));
+                 //squareGeometry.faces.push(new THREE.Face4(0, 1, 2, 3));         //No more Face4 in Three.js
+				 squareGeometry.faces.push(new THREE.Face3(0, 1, 2));
+				 squareGeometry.faces.push(new THREE.Face3(0, 2, 3));
+ 
+                 // Create a white basic material and activate the 'Doubleside' attribute 
+				 // (alternatives are: 'FrontSide' and 'BackSide')
+                 var squareMaterial = new THREE.MeshBasicMaterial({
+                     color:0x0011FF,
+                     side:THREE.DoubleSide
+                 });
+ 
+                 // Create a mesh and insert the geometry and the material. Translate the whole mesh
+                 // by 1.5 on the x axis and by 4 on the z axis and add the mesh to the scene.
+                 var squareMesh = new THREE.Mesh(squareGeometry, squareMaterial);
+                 squareMesh.position.set(1.5, 0.0, 4.0);
+                 scene.add(squareMesh);
+
+                 christmasTree = createChristmasTree(
+                     {branchCount: 8, topY: 3, bottomY: -5, trunkPart: 0.1, maxWidth: 5}
+                 )
+
+                 scene.add(christmasTree);
+
+                 const house = createHouse({width: 4, height: 5, floors: 4});
+                 house.position.set(-4, 1, 4)
+                 scene.add(house);
+
+                 car = createCar({
+                     tyreRatio: 0.15, bodyColor: 0xF0AD31
+                 });
+                 scene.add(car);
+
+                 coneTree = createConeChristmasTree({topY: 3, bottomY: -2, maxWidth: 6, minWidth: 2, trunkPart: 0.2})
+                 scene.add(coneTree);
+             }
+
+             function animateScene() {
+                christmasTree.rotation.y += 0.02;
+                christmasTree.rotation.x += 0.05;
+                christmasTree.rotation.z += 0.07;
+
+                coneTree.rotation.x += 0.02;
+                coneTree.rotation.y += 0.07;
+                coneTree.rotation.z += 0.02;
+
+                const carPosition = car.position.clone();
+                carPosition.project(camera);
+
+                if (carPosition.x > 1 || carPosition.x < -1) {
+                    direction *= -1;
+                }
+                car.position.x += 0.1 * direction;
+
+                requestAnimationFrame(animateScene);
+
+                renderScene();
+             }
+ 
+             /**
+              * Render the scene. Map the 3D world to the 2D screen.
+              */
+             function renderScene(){
+                 renderer.render(scene, camera);
+             }
+         </script>
+     </body>
+</html>

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <title>Lab 02.01 - Ambient and SpotLight</title>
+    <script type="text/javascript" src="three.js"></script>
+    <script type="text/javascript" src="jquery-1.9.0.js"></script>
+    <script type="text/javascript" src="stats.js"></script>
+    <script type="text/javascript" src="dat.gui.js"></script>
+	<script type="text/javascript" src="OrbitControls.js"></script>
+    <style>
+        body {
+            /* set margin to 0 and overflow to hidden, to go fullscreen */
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+
+<div id="Stats-output">
+</div>
+<!-- Div which will hold the Output -->
+<div id="WebGL-output">
+</div>
+
+<!-- Javascript code that runs our Three.js examples -->
+<script type="text/javascript">
+
+    function createConeChristmasTree({
+                                         branchCount: branchCount = 5,
+                                         topY: topY = 2,
+                                         bottomY: bottomY = -2,
+                                         minWidth: minWidth = 1,
+                                         maxWidth: maxWidth = 2,
+                                         trunkPart: trunkPart = 0.2,
+                                         color: color = 0x00ff00,
+                                         trunkColor: trunkColor = 0xaca055
+                                     }) {
+        maxWidth = minWidth > maxWidth - 1 ? minWidth + 1 : maxWidth;
+        topY = bottomY > topY - 1 ? bottomY + 1 : topY;
+
+        const treeHeight = topY - bottomY;
+        const trunkHeight = treeHeight * trunkPart;
+
+        const dy = (treeHeight - trunkHeight) / (branchCount + 1);
+        const dx = (maxWidth - minWidth) / branchCount;
+        const group = new THREE.Group();
+
+        for (var index = 0; index < branchCount; index++) {
+            const branchTop = topY - (index + 1) * dy;
+
+            const geometry = new THREE.CylinderGeometry(0, minWidth / 2 + index * dx / 2, 2 * dy, 32, false);
+            const material = new THREE.MeshPhongMaterial({
+                color: color,
+                side: THREE.DoubleSide,
+                shininess: 1000,
+                specular: true
+            })
+
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+
+            mesh.position.set(-2, branchTop - index * dy / 2, 4);
+            group.add(mesh);
+        }
+
+        const cubeGeometry = new THREE.CubeGeometry(minWidth / 2, trunkHeight, minWidth / 2);
+        const cubeMaterial = new THREE.MeshLambertMaterial({
+            color: trunkColor,
+            side: THREE.DoubleSide,
+        })
+        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+        cube.receiveShadow = true;
+        cube.castShadow = true;
+        cube.position.set(-2, bottomY - trunkHeight / 2, 4)
+        group.add(cube);
+
+        return group;
+    }
+
+        var stats = initStats();
+
+        // create a scene, that will hold all our elements such as objects, cameras and lights.
+        var scene = new THREE.Scene();
+
+        // create a camera, which defines where we're looking at.
+        var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+		const trees = [];
+
+        // create a render and set the size
+        var renderer = new THREE.WebGLRenderer();
+
+        renderer.setClearColor(new THREE.Color(0xEEEEEE));  //background color and opacity
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;   // false is default
+		renderer.autoClear = true;          // default
+		renderer.autoClearColor = true;     // default
+		
+		var ctr = new THREE.OrbitControls( camera, renderer.domElement);
+
+        // create the ground plane
+        var planeGeometry = new THREE.PlaneGeometry(100, 200, 105, 105);
+        var planeMaterial = new THREE.MeshPhongMaterial({color: 0xffffff, shininess: 1000, side:THREE.DoubleSide});
+        var plane = new THREE.Mesh(planeGeometry, planeMaterial);
+        plane.receiveShadow = true;
+
+        // rotate and position the plane
+        plane.rotation.x = -0.5 * Math.PI;
+        plane.position.x = 15
+        plane.position.y = 0
+        plane.position.z = 0
+
+        // add the plane to the scene
+        scene.add(plane);
+
+        // create a cube
+        var cubeGeometry = new THREE.CubeGeometry(8, 4, 4);
+        var cubeMaterial = new THREE.MeshPhongMaterial({color: 0xff0000, specular: true, shininess: 100});
+        var cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+        cube.castShadow = true;
+        cube.receiveShadow = true;
+
+        // position the cube
+        cube.position.x = -4;
+        cube.position.y = 10;
+        cube.position.z = 0;
+
+        // add the cube to the scene
+        scene.add(cube);
+
+        var sphereGeometry = new THREE.SphereGeometry(4, 20, 20);
+        var sphereMaterial = new THREE.MeshPhongMaterial({color: 0x7777ff, specular:true, shininess:100});
+        var sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+
+        // position the sphere
+        sphere.position.x = 20;
+        sphere.position.y = 0;
+        sphere.position.z = 2;
+        sphere.castShadow = true;
+        sphere.receiveShadow = true;
+
+        // add the sphere to the scene
+        scene.add(sphere);
+
+        // position and point the camera to the center of the scene
+        camera.position.x = -25;
+        camera.position.y = 30;
+        camera.position.z = 25;
+        camera.lookAt(new THREE.Vector3(10, 0, 0));
+
+        // add subtle ambient lighting
+        var ambiColor = "#3c3c3c";
+        var ambientLight = new THREE.AmbientLight(ambiColor);
+        scene.add(ambientLight);
+
+        // add spotlight for the shadows
+        var spotLight = new THREE.SpotLight(0xffffff);
+        spotLight.position.set(30, 200, 20);
+        spotLight.castShadow = true;
+
+        spotLight.target = sphere;
+
+        const helper = new THREE.CameraHelper(spotLight.shadow.camera);
+        scene.add(helper);
+
+        spotLight.angle = 0.25;
+        spotLight.penumbra = 1;
+        spotLight.shadow.camera.near = 10;
+        spotLight.shadow.camera.far = 1000;
+        spotLight.shadow.camera.fov = 10;
+        spotLight.shadow.mapSize.width = 1024;
+        spotLight.shadow.mapSize.height = 1024;
+        		
+        scene.add(spotLight);
+
+        // add the output of the renderer to the html element
+        $("#WebGL-output").append(renderer.domElement);
+
+        // call the render function
+        var step = 0;
+
+        var controls = new function () {
+            this.rotationSpeed = 0.02;
+            this.bouncingSpeed = 0.13;
+            this.ambientColor = ambiColor;
+        }
+
+        var gui = new dat.GUI();
+        gui.addColor(controls, 'ambientColor').onChange(function (e) {
+            ambientLight.color = new THREE.Color(e);
+        });
+
+        for (var i = 0; i < 10; i++) {
+            const tree = createConeChristmasTree({branchCount: 7, topY: 20, bottomY: plane.position.y, minWidth: 3, maxWidth: 20})
+            tree.position.set(Math.random() * 50 - 25, 4, Math.random() * 100 - 50);
+            trees.push(tree);
+            scene.add(tree);
+        }
+
+        render();
+
+        function render() {
+            stats.update();
+            // rotate the cube around its axes
+            cube.rotation.x += controls.rotationSpeed;
+            cube.rotation.y += controls.rotationSpeed;
+            cube.rotation.z += controls.rotationSpeed;
+
+            // bounce the sphere up and down
+            step += controls.bouncingSpeed / 2;
+            sphere.position.x = 10 + ( 20 * (Math.cos(step / 2)));
+            sphere.position.y = 2 + ( 100 * Math.abs(Math.sin(step / 2)));
+
+            for (let i = 0; i < trees.length; i++) {
+                trees[i].position.y = 4 + (7 * (i + 1) * Math.abs(Math.cos(step)))
+                trees[i].rotation.x = Math.cos(step);
+                trees[i].rotation.y = Math.sin(2 * step)
+            }
+
+            cube.position.x = -4 + (10 * Math.cos(step / 2));
+            cube.position.z = (10 * Math.sin(step / 2))
+
+            spotLight.position.x = 30 + (50 * Math.cos(step));
+            spotLight.position.z = 20 + (50 * Math.sin(step))
+
+            // render using requestAnimationFrame
+            requestAnimationFrame(render);
+            renderer.render(scene, camera);
+        }
+
+        function initStats() {
+
+            var stats = new Stats();
+
+            stats.setMode(0); // 0: fps, 1: ms
+
+            // Align top-left
+            stats.domElement.style.position = 'absolute';
+            stats.domElement.style.left = '0px';
+            stats.domElement.style.top = '0px';
+
+            $("#Stats-output").append(stats.domElement);
+
+            return stats;
+        }
+  
+
+
+</script>
+</body>
+</html>
